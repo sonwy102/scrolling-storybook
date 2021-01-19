@@ -1,11 +1,12 @@
 import React from "react";
 import './App.css';
 import MapChart from './components/mapChart'
+import RadarChart from './components/RadarChart'
 
 function App() {
   const [mapData, setMapData] = React.useState({
     type: 'loading',
-    objects: 'loading',
+    objects: null,
     arcs: 'loading',
     bbox: 'loading',
     transform: 'loading'
@@ -14,6 +15,7 @@ function App() {
   console.log('mapData: ', mapData);
 
   const fetchJson = () => {
+    console.log('fetching json')
     fetch("./data/world-happiness-dataset/countries-50m.json",
       {
         headers: {
@@ -32,14 +34,19 @@ function App() {
   };
 
   React.useEffect(() => {
+    console.log('calling useEffect')
     fetchJson();
   }, []);
 
+  
   return (
     <div className="App">
-      <MapChart mapData={mapData}></MapChart>
+      {/* <MapChart mapData={mapData}></MapChart> */}
+      <RadarChart />
     </div>
   );
+  
+  
 }
 
 export default App;

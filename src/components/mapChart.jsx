@@ -83,7 +83,8 @@ const MapChart = (props) => {
 
   const outline = { type: "Sphere" };
 
-  const countries_var = topojson.feature(props, props.objects.countries);
+  // const countries = topojson.feature(props, props.objects.countries);
+  const countries = props.objects ? topojson.feature(props, props.objects.countries) : null;
 }
 
 export default MapChart;
