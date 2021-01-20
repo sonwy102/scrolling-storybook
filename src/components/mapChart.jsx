@@ -1,10 +1,15 @@
 import * as d3 from "d3";
 import * as topojson from "topojson-client";
-import Papa from 'papaparse';
+import React from 'react';
+import countryDataCSV from "./test_map_data.csv";
+
 
 // import {legend} from "@d3/color-legend"
 
-const MapChart = (props) => {
+const MapChart = () => {
+
+  const ref = React.useRef();
+
   const rename = new Map([
     ["Antigua and Barbuda", "Antigua and Barb."],
     ["Bolivia (Plurinational State of)", "Bolivia"],
@@ -36,55 +41,125 @@ const MapChart = (props) => {
     ["Viet Nam", "Vietnam"],
   ]);
 
-  // const data = Object.assign(new Map(d3.csvParse(FileAttachment("test_map_data.csv").text(), ({country, hale}) =>
-  // [rename.get(country) || country, +hale])), {title: "Healthy life expectancy (years)"})
 
-  console.log(props);
+  const [mapData, setMapData] = React.useState({
+    type: "loading",
+    objects: null,
+    arcs: "loading",
+    bbox: "loading",
+    transform: "loading",
+  });
+  const [countriesData, setData] = React.useState([]);
 
-  const fetchCsv = async () => {
-    const response = await fetch(
-      "data/world-happiness-dataset/test_map_data.csv"
-    );
-    const reader = response.body.getReader();
-    const result = await reader.read();
-    const decoder = new TextDecoder("utf-8");
-    const csv = await decoder.decode(result.value);
-
-    return csv;
-  };
-
-  const getData = async () => {
-    const data = Papa.parse(await fetchCsv());
-    console.log(data)
-    return data;
-  }
-
-  
-
-  const data = getData();
-  const countriesData = new Map(data.data);
-   
-  
-  
+  console.log('mapData: ', mapData)
+  console.log('countriesData: ', countriesData);
 
   const color = d3
     .scaleSequential()
     .domain(d3.extent(Array.from(countriesData.values())))
     .interpolator(d3.interpolateYlGnBu)
     .unknown("#ccc");
-
   const projection = d3.geoEqualEarth();
-
   const path = d3.geoPath(projection);
-
   const width = 975;
-
   const height = 475;
-
   const outline = { type: "Sphere" };
 
-  // const countries = topojson.feature(props, props.objects.countries);
-  const countries = props.objects ? topojson.feature(props, props.objects.countries) : null;
+  const svg = d3
+    .select(ref.current)
+    .style("display", "block")
+    .attr("viewBox", [0, 0, width, height]);
+
+  const defs = svg.append("defs");
+
+  const g = svg
+    .append("g")
+    .attr("clip-path", `url(${new URL("#clip", window.location)})`);
+
+  
+
+  const fetchJson = async () => {
+    console.log("fetching json");
+    return fetch("./data/world-happiness-dataset/countries-50m.json", {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    })
+      .then((response) => {
+        if(response.ok) {
+          return response.json();
+        } else {
+          throw new Error('Server response wasn\'t OK');
+        }
+      })
+      .then((data) => {
+        console.log(data)
+        setMapData(data);
+      })
+  };
+
+  const getData = async () => {
+
+    d3.csv(countryDataCSV)
+      .then((data) => {
+        console.log('csv data: ', data)
+        return new Map(data.map(i => [rename.get(i.country) || i.country, i.hale]))
+      }).then(map => {
+        setData(map)
+      })
+    
+  }
+  
+
+  React.useEffect(() => {
+    fetchJson();
+
+    getData();
+    
+  }, []);
+
+  if (mapData.objects && countriesData.size > 0) {
+    defs.append("path").attr("id", "outline").attr("d", path(outline));
+    defs
+      .append("clipPath")
+      .attr("id", "clip")
+      .append("use")
+      .attr("xlink:href", new URL("#outline", window.location));
+    g.append("use")
+      .attr("xlink:href", new URL("#outline", window.location))
+      .attr("fill", "white");
+    g.append("g")
+      .selectAll("path")
+      .data(topojson.feature(mapData, mapData.objects.countries).features)
+      .join("path")
+      .attr("fill", (d) => color(countriesData.get(d.properties.name)))
+      .attr("d", path)
+      .append("title")
+      .text(
+        (d) => `${d.properties.name}
+        ${countriesData.has(d.properties.name) ? countriesData.get(d.properties.name) : "N/A"}`
+      );
+    g.append("path")
+      .datum(topojson.mesh(mapData, mapData.objects.countries, (a, b) => a !== b))
+      .attr("fill", "none")
+      .attr("stroke", "white")
+      .attr("stroke-linejoin", "round")
+      .attr("d", path);
+    svg
+      .append("use")
+      .attr("xlink:href", new URL("#outline", window.location))
+      .attr("fill", "none")
+      .attr("stroke", "black");
+  }
+  
+  
+  
+  return(
+    <div className="mapChart">
+      <svg ref={svg}></svg>
+    </div>
+  );
 }
 
 export default MapChart;
